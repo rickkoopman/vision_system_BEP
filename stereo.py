@@ -11,7 +11,7 @@ class Stereo:
         self.right = Camera(sensor_id=1, capture_size=capture_size, display_size=display_size, framerate=framerate)
 
         self.stereo_model = {}
-        self.stereo = cv2.StereoBM_create()
+        self.disparity = Disparity()
 
     def take_pictures(self):
         pictures = []
@@ -116,7 +116,20 @@ class Stereo:
     #         if keyCode == 27 or keyCode == ord('q'):
     #             break
 
-    def disparity(self)
+    def disparity(self):
+        while True:
+            left = self.left.take_picture()
+            right = self.right.take_picture()
+
+            self.disparity.load_images(left, right)
+            disp = self.disparity.disparity
+            normalized = cv2.normalize(disp, None, 0, 255, cv2.CV_8UC1)
+
+            cv2.imshow('disp', normalized)
+
+            keyCode = cv2.waitKey(10) & 0xff
+            if keyCode == 27 or keyCode == ord('q'):
+                break
 
     def disparity_complex(self):
 

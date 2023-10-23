@@ -6,6 +6,7 @@ def color2gray(image):
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
 
+
 class Disparity:
     def __init__(self, num_disparities=3, block_size=15):
         self.stereo = cv2.StereoBM_create()
