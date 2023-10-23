@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import pickle
 from camera import Camera
+from disparity import Disparity
 
 class Stereo:
     def __init__(self, capture_size=(3264, 1848), display_size=(960, 540), framerate=28):
@@ -98,22 +99,24 @@ class Stereo:
         with open(f'{path}.pkl', 'rb') as f:
             self.stereo_model = pickle.load(f)
 
-    def disparity_simple(self, num_disparities=16, block_size=15):
-        while True:
-            left = self.left.take_picture()
-            right = self.right.take_picture()
+    # def disparity_simple(self, num_disparities=16, block_size=15):
+    #     while True:
+    #         left = self.left.take_picture()
+    #         right = self.right.take_picture()
 
-            left_gray = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
-            right_gray = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
+    #         left_gray = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
+    #         right_gray = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
 
-            disparity = self.stereo.compute(left_gray, right_gray)
-            disparity_normalized = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+    #         disparity = self.stereo.compute(left_gray, right_gray)
+    #         disparity_normalized = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
 
-            cv2.imshow('disparity', disparity_normalized)
+    #         cv2.imshow('disparity', disparity_normalized)
 
-            keyCode = cv2.waitKey(10) & 0xff
-            if keyCode == 27 or keyCode == ord('q'):
-                break
+    #         keyCode = cv2.waitKey(10) & 0xff
+    #         if keyCode == 27 or keyCode == ord('q'):
+    #             break
+
+    def disparity(self)
 
     def disparity_complex(self):
 
