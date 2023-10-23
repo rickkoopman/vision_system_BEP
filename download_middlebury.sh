@@ -5,5 +5,6 @@ DIR='middlebury'
 FILENAME='middlebury.zip'
 
 mkdir -p $DIR
-wget $URL -O $DIR/$FILENAME -nc
+# wget $URL -O $DIR/$FILENAME -nc
+curl -o $DIR/$FILENAME $URL
 unzip $DIR/$FILENAME -d $DIR
