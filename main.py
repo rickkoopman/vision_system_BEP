@@ -14,7 +14,7 @@ if __name__ == '__main__':
     # stereo.calibrate()
     # stereo.dump_stereo_model('😀')
 
-    disparity = Disparity()
+    disparity = Disparity(3, 15)
     disparity.load_images(img_l, img_r)
     disparity.compute()
     disparity.show()

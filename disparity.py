@@ -12,10 +12,9 @@ class Disparity:
         self.right = None
         self.disparity = None
 
-        self.configuration = {
-            num_disparities: num_disparities * 16,
-            block_size: block_size,
-        }
+        self.configuration = {}
+        self.set_num_disparities(num_disparities)
+        self.set_block_size(block_size)
 
     def get_disparity(self):
         if self.disparity is not None:
