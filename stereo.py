@@ -11,7 +11,6 @@ class Stereo:
         self.right = Camera(sensor_id=1, capture_size=capture_size, display_size=display_size, framerate=framerate)
 
         self.stereo_model = {}
-        self.disparity = Disparity()
 
     def take_pictures(self):
         pictures = []
@@ -99,31 +98,17 @@ class Stereo:
         with open(f'{path}.pkl', 'rb') as f:
             self.stereo_model = pickle.load(f)
 
-    # def disparity_simple(self, num_disparities=16, block_size=15):
-    #     while True:
-    #         left = self.left.take_picture()
-    #         right = self.right.take_picture()
-
-    #         left_gray = cv2.cvtColor(left, cv2.COLOR_BGR2GRAY)
-    #         right_gray = cv2.cvtColor(right, cv2.COLOR_BGR2GRAY)
-
-    #         disparity = self.stereo.compute(left_gray, right_gray)
-    #         disparity_normalized = cv2.normalize(disparity, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-
-    #         cv2.imshow('disparity', disparity_normalized)
-
-    #         keyCode = cv2.waitKey(10) & 0xff
-    #         if keyCode == 27 or keyCode == ord('q'):
-    #             break
-
     def disparity(self):
         while True:
             left = self.left.take_picture()
             right = self.right.take_picture()
 
-            self.disparity.load_images(left, right)
-            disp = self.disparity.disparity
-            normalized = cv2.normalize(disp, None, 0, 255, cv2.CV_8UC1)
+            disparity = Disparity(3, 15)
+            disparity.load_images(left, right)
+            disparity.compute()
+
+            disp = disparity.get_disparity()
+            normalized = cv2.normalize(disp, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
 
             cv2.imshow('disp', normalized)
 

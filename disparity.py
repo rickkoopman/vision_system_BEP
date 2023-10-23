@@ -5,8 +5,6 @@ import cv2
 def color2gray(image):
     return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-
-
 class Disparity:
     def __init__(self, num_disparities=3, block_size=15):
         self.stereo = cv2.StereoBM_create()
@@ -18,6 +16,12 @@ class Disparity:
             num_disparities: num_disparities * 16,
             block_size: block_size,
         }
+
+    def get_disparity(self):
+        if self.disparity is not None:
+            return self.disparity
+        else:
+            print('Disparity has not yet been computed')
 
     def load_images(self, left, right):
         size = (960, 540)
