@@ -1,180 +1,160 @@
 import cv2
 import numpy as np
 import pickle
-import os
-from gstreamer_pipeline import gstreamer_pipeline
+
+
+def gstreamer_pipeline(
+    sensor_id=0,
+    capture_width=1920,
+    capture_height=1080,
+    display_width=960,
+    display_height=540,
+    framerate=30,
+    flip_method=0,
+):
+    return (
+        "nvarguscamerasrc sensor-id=%d ! "
+        "video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! "
+        "nvvidconv flip-method=%d ! "
+        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
+        "videoconvert ! "
+        "video/x-raw, format=(string)BGR ! appsink"
+        % (
+            sensor_id,
+            capture_width,
+            capture_height,
+            framerate,
+            flip_method,
+            display_width,
+            display_height,
+        )
+    )
 
 
 class Camera:
-    def __init__(
+    def __init__(self, index=0, load_path=None, gstreamer=False):
+        if gstreamer:
+            self.cap = cv2.VideoCapture(
+                gstreamer_pipeline(
+                    sensor_id=index,
+                    capture_width=3264,
+                    capture_height=1848,
+                    display_width=960,
+                    display_height=540,
+                    framerate=28,
+                ),
+                cv2.CAP_GSTREAMER,
+            )
+        else:
+            self.cap = cv2.VideoCapture(index)
+
+        if load_path is not None:
+            with open(load_path, "rb") as f:
+                mtx, dist, newcameramtx, roi = pickle.load(f)
+                self.camera_matrix = mtx
+                self.distortion = dist
+                self.new_camera_matrix = newcameramtx
+                self.region_of_interest = roi
+        else:
+            self.camera_matrix = None
+            self.distortion = None
+            self.new_camera_matrix = None
+            self.region_of_interest = None
+
+    def __del__(self):
+        self.cap.release()
+
+    def gstreamer_set_values(
         self,
         sensor_id=0,
         capture_size=(3264, 1848),
         display_size=(960, 540),
         framerate=28,
     ):
-        capture_width, capture_height = capture_size
-        display_width, display_height = display_size
-
         self.cap = cv2.VideoCapture(
             gstreamer_pipeline(
                 sensor_id=sensor_id,
-                capture_width=capture_width,
-                capture_height=capture_height,
-                display_width=display_width,
-                display_height=display_height,
+                capture_width=capture_size[0],
+                capture_height=capture_size[1],
+                display_width=display_size[0],
+                display_height=display_size[1],
                 framerate=framerate,
             ),
             cv2.CAP_GSTREAMER,
-        ) 
+        )
 
-        self.camera_roll = []
+    def read(self):
+        _, frame = self.cap.read()
+        return frame
 
-        self.camera_model = {}
+    def calibrate(self, checkerboard_size=(6, 9), save_to_path=None):
+        # Get pictures of checkerboard
 
-    def take_picture(self, camera_roll=False):
-        ret, img = self.cap.read()
-        if ret == False:
-            raise RuntimeError("Could not read from VideoCapture")
-        self.last_image = img
-        return self.last_image
-
-    def show_last_image(self, waitKey=False):
-        cv2.imshow("image", self.last_image)
-        if waitKey:
-            cv2.waitKey()
-
-    def film(self, func=None):
-        while True:
-            self.take_picture()
-            self.show_last_image()
-
-            keyCode = cv2.waitKey(10) & 0xFF
-            if keyCode == 27 or keyCode == ord("q"):
-                break
-
-        cv2.destroyAllWindows()
-
-    def take_pictures(self, camera_roll=True):
         pictures = []
 
         while True:
-            self.take_picture(camera_roll=False)
-            self.show_last_image()
+            frame = self.read()
+            cv2.imshow("Calibration", frame)
 
-            keyCode = cv2.waitKey(10) & 0xFF
-            if keyCode == 27 or keyCode == ord("q"):
+            keycode = cv2.waitKey(10) & 0xFF
+            if keycode in [27, ord("q")]:
                 break
-            elif keyCode == ord("f"):
-                # print(f"Taking Picture {len(pictures) + 1}")
+            elif keycode in [32, ord("f")]:
+                print(f"Taking picture ({len(pictures) + 1})")
+                pictures.append(frame)
 
-                pictures.append(self.last_image)
-                if camera_roll:
-                    self.camera_roll.append(self.last_image)
+        # Find checkerboard corners
 
-        cv2.destroyAllWindows()
-        return pictures
-
-    def clear_camera_roll(self):
-        self.camera_roll = []
-
-    def show_camera_roll(self):
-        for image in self.camera_roll:
-            cv2.imshow("camera roll", image)
-            keyCode = cv2.waitKey()
-            if keyCode == 27 or keyCode == ord("q"):
-                break
-
-    def get_calibration_points(self, checkerboard_pictures=None, chessboard_size=(9, 6), block_size=23):
-
-        if checkerboard_pictures == None:
-            checkerboard_pictures = self.take_pictures(camera_roll=False)
-        
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-        # figure out what this code does
-        objp = np.zeros((chessboard_size[0] * chessboard_size[1], 3), np.float32)
-        objp[:, :2] = np.mgrid[0:chessboard_size[0], 0:chessboard_size[1]].T.reshape(-1, 2)
-
-        objp = objp * block_size
+        objp = np.zeros((checkerboard_size[0] * checkerboard_size[1], 3), np.float32)
+        objp[:, :2] = np.mgrid[
+            0 : checkerboard_size[0], 0 : checkerboard_size[1]
+        ].T.reshape(-1, 2)
 
         objpoints = []
         imgpoints = []
 
-        for image in checkerboard_pictures:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        for picture in pictures:
+            gray = cv2.cvtColor(picture, cv2.COLOR_BGR2GRAY)
 
-            ret, corners = cv2.findChessboardCorners(gray, chessboard_size, None)
+            ret, corners = cv2.findChessboardCorners(gray, checkerboard_size, None)
 
             if ret == True:
-                # figure out what objp is/does
                 objpoints.append(objp)
-                corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-                imgpoints.append(corners)
 
-                cv2.drawChessboardCorners(image, chessboard_size, corners2, ret)
-                cv2.imshow('image', image)
+                corners2 = cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+                imgpoints.append(corners2)
+
+                cv2.drawChessboardCorners(picture, checkerboard_size, corners2, ret)
+                cv2.imshow("corners", picture)
                 cv2.waitKey()
 
         cv2.destroyAllWindows()
 
-        image_size = checkerboard_pictures[0].shape[:2]
+        # Calculate values
 
-        return objpoints, imgpoints, image_size
-    
-    def calibrate_compute(self, objpoints, imgpoints, image_size, chessboard_size=(9, 6), block_size=23):
-        height, width = image_size
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
+            objpoints, imgpoints, gray.shape[::-1], None, None
+        )
+        w, h = pictures[0].shape[:2]
+        newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
 
-        ret, camera_matrix, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, image_size, None, None)
-        new_camera_matrix, roi = cv2.getOptimalNewCameraMatrix(camera_matrix, dist, (width, height), 1, (width, height))
+        self.camera_matrix = mtx
+        self.distortion = dist
+        self.new_camera_matrix = newcameramtx
+        self.region_of_interest = roi
 
-        self.camera_model = dict([
-            ('mtx', camera_matrix),
-            ('new_mtx', new_camera_matrix),
-            ('roi', roi),
-            ('dist', dist),
-            ('rvecs', rvecs),
-            ('tvecs', tvecs)
-        ])
+        # Save values
 
-        return ret, camera_matrix, new_camera_matrix, dist, rvecs, tvecs, roi
-
-    def calibrate(self, chessboard_size=(9, 6), block_size=23):
-        
-        objpoints, imgpoints, image_size = self.get_calibration_points(chessboard_size=chessboard_size, block_size=block_size)
-        
-        ret, camera_matrix, new_camera_matrix, dist, rvecs, tvecs, roi = self.calibrate_compute(objpoints, imgpoints, image_size)
-
-        print('normal camera matrix:')
-        print(camera_matrix)
-
-        print('new camera matrix:')
-        print(new_camera_matrix)
-
-        # calculate error
-
-        mean_error = 0
-
-        for i in range(len(objpoints)):
-            imgpoints2, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], camera_matrix, dist)
-            error = cv2.norm(imgpoints[i], imgpoints2, cv2.NORM_L2)/len(imgpoints2)
-            mean_error += error
-
-        mean_error /= len(objpoints)
-        print('total error: {}'.format(mean_error))
-        # print(f'total error: {mean_error}')
-
-    def dump_camera_model(self, path):
-        with open('{}.pkl'.format(path), 'wb') as f:
-            pickle.dump(self.camera_model, f)
-        # with open(f'{path}.pkl', 'wb') as f:
-        #     pickle.dump(self.camera_model, f)
-
-    def load_camera_model(self, path):
-        with open('{}.pkl'.format(path), 'rb') as f:
-        # with open(f'{path}.pkl', 'rb') as f:
-            self.camera_model = pickle.load(f)
-
-    def __del__(self):
-        self.cap.release()
-        cv2.destroyAllWindows()
+        if save_to_path is not None:
+            with open(save_to_path, "wb") as f:
+                pickle.dump(
+                    [
+                        self.camera_matrix,
+                        self.distortion,
+                        self.new_camera_matrix,
+                        self.region_of_interest,
+                    ],
+                    f,
+                )

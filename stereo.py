@@ -3,7 +3,7 @@ import cv2
 import pickle
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from camera2 import Camera
+from camera import Camera
 from disparity import Disparity
 
 class Stereo:
