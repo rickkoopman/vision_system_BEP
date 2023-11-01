@@ -66,7 +66,7 @@ class Camera:
             if keyCode == 27 or keyCode == ord("q"):
                 break
             elif keyCode == ord("f"):
-                print(f"Taking Picture {len(pictures) + 1}")
+                # print(f"Taking Picture {len(pictures) + 1}")
 
                 pictures.append(self.last_image)
                 if camera_roll:
@@ -161,14 +161,18 @@ class Camera:
             mean_error += error
 
         mean_error /= len(objpoints)
-        print(f'total error: {mean_error}')
+        print('total error: {}'.format(mean_error))
+        # print(f'total error: {mean_error}')
 
     def dump_camera_model(self, path):
-        with open(f'{path}.pkl', 'wb') as f:
+        with open('{}.pkl'.format(path), 'wb') as f:
             pickle.dump(self.camera_model, f)
+        # with open(f'{path}.pkl', 'wb') as f:
+        #     pickle.dump(self.camera_model, f)
 
     def load_camera_model(self, path):
-        with open(f'{path}.pkl', 'rb') as f:
+        with open('{}.pkl'.format(path), 'rb') as f:
+        # with open(f'{path}.pkl', 'rb') as f:
             self.camera_model = pickle.load(f)
 
     def __del__(self):

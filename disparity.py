@@ -1,65 +1,78 @@
 import numpy as np
 import cv2
-
-
-def color2gray(image):
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+import matplotlib.pyplot as plt
 
 class Disparity:
-    def __init__(self, num_disparities=3, block_size=15):
-        self.stereo = cv2.StereoBM_create()
-        self.left = None
-        self.right = None
-        self.disparity = None
+    def __init__(self, num_disparities=16*8, block_size=15, lmbda=8000, sigma=1.5):
+        self.__num_disparities = num_disparities
+        self.__block_size = block_size
+        self.__lambda = lmbda
+        self.__sigma = sigma
 
-        self.configuration = {}
-        self.set_num_disparities(num_disparities)
-        self.set_block_size(block_size)
+        self.__left_matcher = cv2.StereoBM.create(self.__num_disparities, self.__block_size)
+        self.__right_matcher = cv2.ximgproc.createRightMatcher(self.__left_matcher)
 
-    def get_disparity(self):
-        if self.disparity is not None:
-            return self.disparity
-        else:
-            print('Disparity has not yet been computed')
+        self.__wls_filter = cv2.ximgproc.createDisparityWLSFilter(self.__left_matcher)
+        self.__wls_filter.setLambda(self.__lambda)
+        self.__wls_filter.setSigmaColor(self.__sigma)
 
-    def load_images(self, left, right):
-        size = (960, 540)
+        self.__left_image = None
+        self.__right_image = None
+        self.__disparity = None
 
-        left = cv2.resize(left, size)
-        right = cv2.resize(right, size)
+    def load_images(self, left_image, right_image, size=(960, 540), blur_size=3):
 
-        self.left = color2gray(left)
-        self.right = color2gray(right)
+        left_image = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY)
+        right_image = cv2.cvtColor(right_image, cv2.COLOR_BGR2GRAY)
+        
+        left_image = cv2.resize(left_image, size)
+        right_image = cv2.resize(right_image, size)
 
-    def set_block_size(self, block_size):
-        self.configuration["block_size"] = block_size
-        self.stereo.setBlockSize(block_size)
+        left_image = cv2.medianBlur(left_image, blur_size)
+        right_image = cv2.medianBlur(right_image, blur_size)
 
-    def set_num_disparities(self, num_disparities):
-        self.configuration["num_disparities"] = num_disparities
-        self.stereo.setNumDisparities(16 * num_disparities)
+        self.__left_image = left_image
+        self.__right_image = right_image
 
-    def compute(self, wls=False):
-        self.disparity = self.stereo.compute(self.left, self.right)
+    def compute(self, wls_filter=False, remove_outliers=False):
 
-    def show_images(self):
-        if (self.left is not None) and (self.right is not None):
-            cv2.imshow("images", np.hstack((self.left, self.right)))
-            cv2.waitKey()
-            cv2.destroyAllWindows()
-        else:
+        if self.__left_image is None or self.__right_image is None:
             print("No images loaded yet")
+            return
 
-    def show(self):
-        if self.disparity is not None:
-            normalized = cv2.normalize(
-                self.disparity, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1
-            )
-            cv2.imshow(
-                f"ND: {self.configuration['num_disparities']} | BS: {self.configuration['block_size']}",
-                normalized,
-            )
-            cv2.waitKey()
-            cv2.destroyAllWindows()
-        else:
-            print("No disparity calculated yet")
+        disparity = self.__left_matcher.compute(self.__left_image, self.__right_image)
+
+        if wls_filter:
+            disparity_left = disparity
+            disparity_right = self.__right_matcher.compute(self.__right_image, self.__left_image)
+            disparity = self.__wls_filter.filter(disparity_left, self.__left_image, disparity_map_right=disparity_right)
+
+        disparity = np.where(disparity < 0, np.nan, disparity)[:, self.__num_disparities:]
+
+        if remove_outliers:
+            std = np.nanstd(disparity)
+            mean = np.nanmean(disparity)
+            
+            dist = np.abs(disparity - mean)
+            disparity = np.where(dist < std * 2, disparity, np.nan)
+
+        self.__disparity = disparity / self.__num_disparities
+        return self.__disparity
+    
+    @property
+    def disparity(self):
+        return self.__disparity
+
+if __name__ == "__main__":
+
+    middlebury_images = "chess1"
+    left_image = cv2.imread(f"./middlebury/data/{middlebury_images}/im0.png")
+    right_image = cv2.imread(f"./middlebury/data/{middlebury_images}/im1.png")
+
+    stereo = Disparity(num_disparities=16*8, block_size=9)
+    stereo.load_images(left_image, right_image)
+    stereo.compute(wls_filter=True)
+    
+    fig = plt.figure(figsize=(16, 12))
+    plt.imshow(stereo.disparity)
+    plt.show()

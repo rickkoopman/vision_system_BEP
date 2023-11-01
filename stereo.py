@@ -1,153 +1,47 @@
 import numpy as np
 import cv2
 import pickle
-from camera import Camera
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from camera2 import Camera
 from disparity import Disparity
 
 class Stereo:
     def __init__(self, capture_size=(3264, 1848), display_size=(960, 540), framerate=28):
 
-        self.left = Camera(sensor_id=0, capture_size=capture_size, display_size=display_size, framerate=framerate)
-        self.right = Camera(sensor_id=1, capture_size=capture_size, display_size=display_size, framerate=framerate)
+        self.__left_camera = Camera(sensor_id=0, capture_size=capture_size, display_size=display_size, framerate=framerate)
+        self.__right_camera = Camera(sensor_id=1, capture_size=capture_size, display_size=display_size, framerate=framerate)
 
-        self.stereo_model = {}
+    def read(self):
+        left_image = self.__left_camera.read()
+        right_image = self.__right_camera.read()
+        return left_image, right_image
+    
 
-    def take_pictures(self):
-        pictures = []
+if __name__ == "__main__":
+    stereo = Stereo()
+    matcher = Disparity(num_disparities=16 * 8, block_size=9)
 
-        while True:
-            left = self.left.take_picture()
-            right = self.right.take_picture()
+    # left_image = cv2.imread(f'./middlebury/data/chess1/im0.png')
+    # right_image = cv2.imread(f'./middlebury/data/chess1/im1.png')
 
-            cv2.imshow('film', np.hstack((left, right)))
+    matcher.load_images(*stereo.read(), size=(960, 540), blur_size=3)
+    disparity = matcher.compute(wls_filter=True, remove_outliers=False)
 
-            keyCode = cv2.waitKey(10) & 0xff
-            if keyCode == 27 or keyCode == ord('q'):
-                break
-            elif keyCode == ord('f'):
-                print(f"Taking Picture {len(pictures) + 1}")
-                pictures.append((left, right))
+    fig = plt.figure(figsize=(14, 10))
+    plt.imshow(disparity, cmap='plasma')
+    plt.show()
 
-        return pictures
+    # while True:
+    #     left, right = stereo.read()
+    #     matcher.load_images(left, right)
+    #     matcher.compute()
 
-    def get_calibration_points(self, checkerboard_pictures=None, chessboard_size=(9, 6), block_size=23):
-        if checkerboard_pictures == None:
-            checkerboard_pictures = self.take_pictures()
-            
-        left_pictures = [left for left, _ in checkerboard_pictures]
-        right_pictures = [right for _, right in checkerboard_pictures]
+    #     disparity_normalized = cv2.normalize(matcher.disparity, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+    #     cv2.imshow('disparity', disparity_normalized)
 
-        objpoints, imgpoints_left, image_size = self.left.get_calibration_points(left_pictures)
-        _, imgpoints_right, _ = self.right.get_calibration_points(right_pictures)
+    #     keycode = cv2.waitKey(10) & 0xff
+    #     if keycode in [27, ord('q')]:
+    #         break
 
-        return objpoints, imgpoints_left, imgpoints_right, image_size
-
-    def calibrate_compute(self, objpoints, imgpoints_left, imgpoints_right, image_size, chessboard_size=(9, 6), block_size=23):
-
-        self.left.calibrate_compute(objpoints, imgpoints_left, image_size, chessboard_size, block_size)
-        self.right.calibrate_compute(objpoints, imgpoints_right, image_size, chessboard_size, block_size)
-
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-        width, height = image_size
-        stereo_calibration_flags = cv2.CALIB_FIX_INTRINSIC
-
-        ret, mtx_left, dist_left, mtx_right, dist_right, R, T, E, F = cv2.stereoCalibrate(
-            objpoints, 
-            imgpoints_left, 
-            imgpoints_right, 
-            self.left.camera_model['mtx'],
-            self.left.camera_model['dist'],
-            self.right.camera_model['mtx'],
-            self.right.camera_model['dist'],
-            (width, height),
-            criteria=criteria,
-            flags=stereo_calibration_flags
-        )
-
-        return ret, mtx_left, dist_left, mtx_right, dist_right, R, T, E, F
-
-
-    def calibrate(self, chessboard_size=(9, 6), block_size=23):
-        objpoints, imgpoints_left, imgpoints_right, image_size = self.get_calibration_points(chessboard_size=chessboard_size, block_size=block_size)
-
-        ret, mtx_left, dist_left, mtx_right, dist_right, R, T, E, F = self.calibrate_compute(
-            objpoints, 
-            imgpoints_left, 
-            imgpoints_right, 
-            image_size,
-            chessboard_size,
-            block_size,
-        )
-        
-        self.stereo_model = dict([
-            ('mtx_left', mtx_left),
-            ('dist_left', dist_left),
-            ('mtx_right', mtx_right),
-            ('dist_right', dist_right),
-            ('rotation', R),
-            ('translation', T),
-            ('essential', E),
-            ('fundamental', F)
-        ])
-
-    def dump_stereo_model(self, path):
-        with open(f'{path}.pkl', 'wb') as f:
-            pickle.dump(self.stereo_model, f)
-
-    def load_stereo_model(self, path):
-        with open(f'{path}.pkl', 'rb') as f:
-            self.stereo_model = pickle.load(f)
-
-    def disparity(self):
-        while True:
-            left = self.left.take_picture()
-            right = self.right.take_picture()
-
-            disparity = Disparity(3, 15)
-            disparity.load_images(left, right)
-            disparity.compute()
-
-            disp = disparity.get_disparity()
-            normalized = cv2.normalize(disp, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-
-            cv2.imshow('disp', normalized)
-
-            keyCode = cv2.waitKey(10) & 0xff
-            if keyCode == 27 or keyCode == ord('q'):
-                break
-
-    def disparity_complex(self):
-
-        mtx_left = self.stereo_model['mtx_left']
-        mtx_right = self.stereo_model['mtx_right']
-        dist_left = self.stereo_model['dist_left']
-        dist_right = self.stereo_model['dist_right']
-        rotation = self.stereo_model['rotation']
-        translation = self.stereo_model['translation']
-
-        R1, R2, P1, P2, Q, roi1, roi2 = cv2.rectifyStereo(mtx_left, dist_left, mtx_right, dist_right, rotation, translation)
-
-        # depth = cv2.reprojectImageTo3D()
-
-
-    def overlap(self):
-        while True:
-            left = self.left.take_picture()
-            right = self.right.take_picture()
-
-            combine = cv2.addWeighted(left, 0.5, right, 0.5, 0)
-
-            keyCode = cv2.waitKey(10) & 0xff
-            if keyCode == 27 or keyCode == ord('q'):
-                break
-
-    def film(self):
-        while True:
-            left = self.left.take_picture()
-            right = self.right.take_picture()
-
-            cv2.imshow('film', np.hstack((left, right)))
-
-            keyCode = cv2.waitKey(10) & 0xff
-            if keyCode == 27 or keyCode == ord('q'):
-                break
+    # cv2.destroyAllWindows()
