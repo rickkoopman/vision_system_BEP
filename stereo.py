@@ -31,3 +31,5 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(14, 10))
     plt.imshow(disparity, cmap='plasma')
     plt.show()
+
+    # rick
