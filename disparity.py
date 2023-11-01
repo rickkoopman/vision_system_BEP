@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
+
 class Disparity:
     def __init__(self, num_disparities=16*8, block_size=15, lmbda=8000, sigma=1.5):
         self.__num_disparities = num_disparities
@@ -65,14 +66,29 @@ class Disparity:
 
 if __name__ == "__main__":
 
-    middlebury_images = "chess1"
-    left_image = cv2.imread(f"./middlebury/data/{middlebury_images}/im0.png")
-    right_image = cv2.imread(f"./middlebury/data/{middlebury_images}/im1.png")
+    import os
+    import random
 
     stereo = Disparity(num_disparities=16*8, block_size=9)
-    stereo.load_images(left_image, right_image)
-    stereo.compute(wls_filter=True)
+
+    image_names = os.listdir('./middlebury/test')
+    random.shuffle(image_names)
     
-    fig = plt.figure(figsize=(16, 12))
-    plt.imshow(stereo.disparity)
+    fig = plt.figure()
+    fig.tight_layout()
+
+    for i, image_name in enumerate(image_names[:3]):
+        left_image = cv2.imread(f"./middlebury/test/{image_name}/left.png")
+        right_image = cv2.imread(f"./middlebury/test/{image_name}/right.png")
+
+        stereo.load_images(left_image, right_image)
+        stereo.compute(wls_filter=True, remove_outliers=False)
+        
+        ax1 = plt.subplot(2, 3, i + 1)
+        ax2 = plt.subplot(2, 3, i + 4)
+        ax1.imshow(stereo.disparity, cmap='plasma')
+        ax2.imshow(left_image)
+    
+    manager = plt.get_current_fig_manager()
+    manager.full_screen_toggle()
     plt.show()
