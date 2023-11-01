@@ -31,17 +31,3 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(14, 10))
     plt.imshow(disparity, cmap='plasma')
     plt.show()
-
-    # while True:
-    #     left, right = stereo.read()
-    #     matcher.load_images(left, right)
-    #     matcher.compute()
-
-    #     disparity_normalized = cv2.normalize(matcher.disparity, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
-    #     cv2.imshow('disparity', disparity_normalized)
-
-    #     keycode = cv2.waitKey(10) & 0xff
-    #     if keycode in [27, ord('q')]:
-    #         break
-
-    # cv2.destroyAllWindows()
