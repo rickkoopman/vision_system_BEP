@@ -20,8 +20,8 @@ def showcase_disparity():
     fig.tight_layout()
 
     for i, image_name in enumerate(image_names[:3]):
-        left_image = cv2.imread(f"./middlebury/data/{image_name}/left.png")
-        right_image = cv2.imread(f"./middlebury/data/{image_name}/right.png")
+        left_image = cv2.imread(f"./middlebury/data/{image_name}/im0.png")
+        right_image = cv2.imread(f"./middlebury/data/{image_name}/im1.png")
 
         stereo.load_images(left_image, right_image)
         stereo.compute(wls_filter=True, remove_outliers=False)
