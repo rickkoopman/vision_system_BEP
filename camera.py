@@ -2,33 +2,7 @@ import cv2
 import numpy as np
 import pickle
 
-
-def gstreamer_pipeline(
-    sensor_id=0,
-    capture_width=1920,
-    capture_height=1080,
-    display_width=960,
-    display_height=540,
-    framerate=30,
-    flip_method=0,
-):
-    return (
-        "nvarguscamerasrc sensor-id=%d ! "
-        "video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! "
-        "nvvidconv flip-method=%d ! "
-        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
-        "videoconvert ! "
-        "video/x-raw, format=(string)BGR ! appsink"
-        % (
-            sensor_id,
-            capture_width,
-            capture_height,
-            framerate,
-            flip_method,
-            display_width,
-            display_height,
-        )
-    )
+from gstreamer_pipeline import gstreamer_pipeline
 
 
 class Camera:
@@ -87,7 +61,7 @@ class Camera:
         _, frame = self.cap.read()
         return frame
 
-    def calibrate(self, checkerboard_size=(6, 9), save_to_path=None):
+    def calibrate(self, checkerboard_size=(9, 6), save_to_path=None):
         # Get pictures of checkerboard
 
         pictures = []
@@ -109,7 +83,7 @@ class Camera:
 
         objp = np.zeros((checkerboard_size[0] * checkerboard_size[1], 3), np.float32)
         objp[:, :2] = np.mgrid[
-            0 : checkerboard_size[0], 0 : checkerboard_size[1]
+            0 : checkerboard_size[1], 0 : checkerboard_size[0]
         ].T.reshape(-1, 2)
 
         objpoints = []
@@ -158,3 +132,14 @@ class Camera:
                     ],
                     f,
                 )
+
+
+if __name__ == "__main__":
+    calibrate = True
+
+    location = './calibration_left.pkl'
+    camera = Camera(0, gstreamer=True, load_path=None if calibrate else location)
+    if calibrate:
+        camera.calibrate(save_to_path=location)
+    print(camera.camera_matrix)
+    print(camera.new_camera_matrix)
