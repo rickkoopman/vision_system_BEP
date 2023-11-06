@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import os
 import random
 
-from camera import Camera
+from camera import Camera, CameraGStreamer
 from stereo import Stereo
 from disparity import Disparity
 
@@ -36,8 +36,20 @@ def showcase_disparity():
 
 
 if __name__ == "__main__":
-    stereo = Stereo()
-    left, right = stereo.read()
+    stereo = Stereo(gstreamer=True, capture_size=(1920, 1080), display_size=(1920, 1080), framerate=28)
+    matcher = Disparity(num_disparities=16*8, block_size=7)
 
-    cv2.imwrite('left.png', left)
-    cv2.imwrite('right.png', right)
+    # matcher.load_images(*stereo.read(), blur_size=5)
+    # matcher.compute()
+    # matcher.plot()
+
+    while True:
+        matcher.load_images(*stereo.read(), blur_size=5)
+        matcher.compute()
+        cv2.imshow('disparity', matcher.normalized_disparity)
+
+        keyCode = cv2.waitKey(10) & 0xff
+        if keyCode in [27, ord('q')]:
+            break
+
+    cv2.destroyAllWindows()

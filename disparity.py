@@ -70,3 +70,26 @@ class Disparity:
     @property
     def disparity(self):
         return self.__disparity
+    
+    @property
+    def normalized_disparity(self):
+        disp = self.__disparity
+        return (disp - disp.min()) / (disp.max() - disp.min())
+    
+    def plot(self):
+        if self.__disparity is None:
+            print("Disparity has not yet been computed")
+        else:
+            disp = self.__disparity
+            disp = np.where(disp < 0, np.nan, disp)
+
+            fig, axs = plt.subplots(1, 2)
+            for ax in axs:
+                ax.set_xticks([])
+                ax.set_yticks([])
+            axs[0].imshow(disp)
+            axs[1].imshow(self.__left_image)
+
+            manager = plt.get_current_fig_manager()
+            manager.full_screen_toggle()
+            plt.show()

@@ -6,29 +6,11 @@ from gstreamer_pipeline import gstreamer_pipeline
 
 
 class Camera:
-    def __init__(self, index=0, load_path=None, gstreamer=False):
-        if gstreamer:
-            self.cap = cv2.VideoCapture(
-                gstreamer_pipeline(
-                    sensor_id=index,
-                    capture_width=3264,
-                    capture_height=1848,
-                    display_width=960,
-                    display_height=540,
-                    framerate=28,
-                ),
-                cv2.CAP_GSTREAMER,
-            )
-        else:
-            self.cap = cv2.VideoCapture(index)
+    def __init__(self, index=0, load_path=None):
+        self.cap = cv2.VideoCapture(index)
 
         if load_path is not None:
-            with open(load_path, "rb") as f:
-                mtx, dist, newcameramtx, roi = pickle.load(f)
-                self.camera_matrix = mtx
-                self.distortion = dist
-                self.new_camera_matrix = newcameramtx
-                self.region_of_interest = roi
+            self.__load_calibration(load_path)
         else:
             self.camera_matrix = None
             self.distortion = None
@@ -38,30 +20,11 @@ class Camera:
     def __del__(self):
         self.cap.release()
 
-    def gstreamer_set_values(
-        self,
-        sensor_id=0,
-        capture_size=(3264, 1848),
-        display_size=(960, 540),
-        framerate=28,
-    ):
-        self.cap = cv2.VideoCapture(
-            gstreamer_pipeline(
-                sensor_id=sensor_id,
-                capture_width=capture_size[0],
-                capture_height=capture_size[1],
-                display_width=display_size[0],
-                display_height=display_size[1],
-                framerate=framerate,
-            ),
-            cv2.CAP_GSTREAMER,
-        )
-
     def read(self):
         _, frame = self.cap.read()
         return frame
 
-    def calibrate(self, checkerboard_size=(9, 6), save_to_path=None):
+    def calibrate(self, checkerboard_size=(9, 6), save_path=None):
         # Get pictures of checkerboard
 
         pictures = []
@@ -121,23 +84,66 @@ class Camera:
 
         # Save values
 
-        if save_to_path is not None:
-            with open(save_to_path, "wb") as f:
-                pickle.dump(
-                    [
-                        self.camera_matrix,
-                        self.distortion,
-                        self.new_camera_matrix,
-                        self.region_of_interest,
-                    ],
-                    f,
-                )
+        if save_path is not None:
+            self.__save_calibration(save_path)
+
+    def __save_calibration(self, save_path):
+        with open(save_path, "wb") as f:
+            pickle.dump(
+                [
+                    self.camera_matrix,
+                    self.distortion,
+                    self.new_camera_matrix,
+                    self.region_of_interest,
+                ],
+                f,
+            )
+
+    def __load_calibration(self, load_path):
+        with open(load_path, "rb") as f:
+            mtx, dist, newcameramtx, roi = pickle.load(f)
+            self.camera_matrix = mtx
+            self.distortion = dist
+            self.new_camera_matrix = newcameramtx
+            self.region_of_interest = roi
+
+
+class CameraGStreamer(Camera):
+    def __init__(
+        self,
+        index=0,
+        load_path=None,
+        capture_size=(3264, 1848),
+        display_size=(1920, 1080),
+        framerate=28,
+    ):
+        capture_width, capture_height = capture_size
+        display_width, display_height = display_size
+
+        self.cap = cv2.VideoCapture(
+            gstreamer_pipeline(
+                sensor_id=index,
+                capture_width=capture_width,
+                capture_height=capture_height,
+                display_width=display_width,
+                display_height=display_height,
+                framerate=framerate,
+            )
+        )
+
+        if load_path is not None:
+            self.__load_calibration(load_path)
+        else:
+            self.camera_matrix = None
+            self.distortion = None
+            self.new_camera_matrix = None
+            self.region_of_interest = None
 
 
 if __name__ == "__main__":
     calibrate = True
 
-    location = './calibration_left.pkl'
+    location = "./calibration_left.pkl"
     camera = Camera(0, gstreamer=True, load_path=None if calibrate else location)
     if calibrate:
         camera.calibrate(save_to_path=location)
