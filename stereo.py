@@ -4,7 +4,7 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from camera import Camera, CameraGStreamer
-from disparity import Disparity
+from matcher import Disparity
 
 
 class Stereo:

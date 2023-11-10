@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pickle
+import time
 
 from gstreamer_pipeline import gstreamer_pipeline
 
@@ -29,16 +30,24 @@ class Camera:
 
         pictures = []
 
-        while True:
+        # while True:
+        #     frame = self.read()
+        #     cv2.imshow("Calibration", frame)
+
+        #     keycode = cv2.waitKey(10) & 0xFF
+        #     if keycode in [27, ord("q")]:
+        #         break
+        #     elif keycode in [32, ord("f")]:
+        #         print(f"Taking picture ({len(pictures) + 1})")
+        #         pictures.append(frame)
+
+        for _ in range(12):
             frame = self.read()
             cv2.imshow("Calibration", frame)
-
-            keycode = cv2.waitKey(10) & 0xFF
-            if keycode in [27, ord("q")]:
-                break
-            elif keycode in [32, ord("f")]:
-                print(f"Taking picture ({len(pictures) + 1})")
-                pictures.append(frame)
+            pictures.append(frame)
+            time.sleep(1)
+            
+        cv2.destroyAllWindows()
 
         # Find checkerboard corners
 
@@ -144,7 +153,7 @@ if __name__ == "__main__":
     calibrate = True
 
     location = "./calibration_left.pkl"
-    camera = Camera(0, gstreamer=True, load_path=None if calibrate else location)
+    camera = CameraGStreamer(0, load_path=None if calibrate else location)
     if calibrate:
         camera.calibrate(save_to_path=location)
     print(camera.camera_matrix)
